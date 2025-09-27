@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Weather App</title>
+<style>
+  body {
+    margin:0;
+    font-family:sans-serif;
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    height:100vh;
+    background: linear-gradient(180deg,#6b7aa3,#3b4f73);
+    color:#fff;
+  }
+  .app {
+    width:100%;
+    max-width:400px;
+    background: rgba(0,0,0,0.4);
+    border-radius:12px;
+    padding:20px;
+    text-align:center;
+    box-shadow:0 8px 25px rgba(0,0,0,0.3);
+  }
+  h1 {
+    margin:0 0 15px;
+    font-size:22px;
+  }
+  .search-bar {
+    display:flex;
+    margin-bottom:15px;
+  }
+  .search-bar input {
+    flex:1;
+    padding:8px;
+    border:none;
+    border-radius:8px 0 0 8px;
+    outline:none;
+  }
+  .search-bar button {
+    border:none;
+    padding:8px 12px;
+    background:#ffd166;
+    color:#222;
+    border-radius:0 8px 8px 0;
+    font-weight:bold;
+    cursor:pointer;
+  }
+  .weather-display {
+    margin-top:10px;
+  }
+  .temp {
+    font-size:48px;
+    font-weight:bold;
+  }
+  .desc {
+    font-size:18px;
+    text-transform:capitalize;
+  }
+  .humidity {
+    margin-top:5px;
+    font-size:14px;
+  }
+  .loading, .error {
+    margin-top:10px;
+    font-size:14px;
+  }
+  .forecast {
+    margin-top:15px;
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:5px;
+  }
+  .day {
+    background:rgba(255,255,255,0.1);
+    border-radius:8px;
+    padding:6px;
+    font-size:12px;
+  }
+  @media(max-width:500px){
+    .temp{font-size:36px}
+    .forecast{grid-template-columns:repeat(3,1fr)}
+  }
+</style>
+</head>
+<body>
+  <div class="app">
+    <h1>Weather App</h1>
+    <div class="search-bar">
+      <input id="cityInput" placeholder="Enter city">
+      <button id="searchBtn">Search</button>
+    </div>
+    <div id="loading" class="loading" style="display:none;">Loading...</div>
+    <div id="error" class="error" style="display:none;color:#ff6b6b;"></div>
+    <div class="weather-display" id="weatherDisplay" style="display:none;">
+      <div class="temp" id="temp"></div>
+      <div class="desc" id="desc"></div>
+      <div class="humidity" id="humidity"></div>
+    </div>
+    <div id="forecast" class="forecast"></div>
+  </div>
+
+<script>
+const API_KEY = "e7dc338f48b07fc9682995811635ceb7";
+const searchBtn = document.getElementById("searchBtn");
+const cityInput = document.getElementById("cityInput");
+const loadingEl = document.getElementById("loading");
+const errorEl = document.getElementById("error");
+const displayEl = document.getElementById("weatherDisplay");
+const tempEl = document.getElementById("temp");
+const descEl = document.getElementById("desc");
+const humidityEl = document.getElementById("humidity");
+const forecastEl = document.getElementById("forecast");
+
+// ---------------- Components ----------------
+function showLoading(){
+  loadingEl.style.display="block";
+  errorEl.style.display="none";
+  displayEl.style.display="none";
+  forecastEl.innerHTML="";
+}
+function showError(msg){
+  loadingEl.style.display="none";
+  errorEl.style.display="block";
+  errorEl.textContent=msg;
+}
+function showWeather(data){
+  loadingEl.style.display="none";
+  errorEl.style.display="none";
+  displayEl.style.display="block";
+
+  tempEl.textContent = Math.round(data.main.temp) + "°C";
+  descEl.textContent = data.weather[0].description;
+  humidityEl.textContent = "Humidity: " + data.main.humidity + "%";
+}
+function showForecast(list){
+  forecastEl.innerHTML="";
+  const daily = {};
+  list.forEach(item=>{
+    const date = new Date(item.dt_txt);
+    const day = date.toLocaleDateString(undefined,{weekday:"short"});
+    if(!daily[day] && date.getHours()===12){ // pick midday forecast
+      daily[day] = item;
+    }
+  });
+  Object.keys(daily).slice(0,5).forEach(day=>{
+    const item = daily[day];
+    const div = document.createElement("div");
+    div.className="day";
+    div.innerHTML = `
+      <div>${day}</div>
+      <div>${Math.round(item.main.temp)}°C</div>
+      <div style="font-size:11px">${item.weather[0].main}</div>
+    `;
+    forecastEl.appendChild(div);
+  });
+}
+
+// ---------------- Fetch Logic ----------------
+async function fetchWeather(city){
+  showLoading();
+  try{
+    const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric`);
+    if(!res.ok) throw new Error("City not found");
+    const data = await res.json();
+    showWeather(data);
+
+    // Save last city
+    localStorage.setItem("lastCity", city);
+
+    // Forecast
+    const forecastRes = await fetch(`https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=${API_KEY}&units=metric`);
+    const forecastData = await forecastRes.json();
+    showForecast(forecastData.list);
+  }catch(err){
+    showError(err.message);
+  }
+}
+
+// ---------------- Events ----------------
+searchBtn.addEventListener("click", ()=>{
+  const city = cityInput.value.trim();
+  if(city) fetchWeather(city);
+});
+cityInput.addEventListener("keypress", e=>{
+  if(e.key==="Enter") searchBtn.click();
+});
+
+// ---------------- Init ----------------
+const lastCity = localStorage.getItem("lastCity") || "New Delhi";
+cityInput.value = lastCity;
+fetchWeather(lastCity);
+</script>
+</body>
+</html>
+
+
